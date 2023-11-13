@@ -834,3 +834,504 @@ def suspender_servicio():
         finally: 
             if conexion:
                 conexion.close()
+def recuperar_servicio():
+    while True:
+        try: 
+            with sqlite3.connect("base_de_datos.db") as conexion:
+                cursor = conexion.cursor()
+
+                cursor.execute("SELECT clave, nombre FROM servicios WHERE cancelado = 'Sí'")
+                registros = cursor.fetchall()
+
+                if registros:
+                    tabla = PrettyTable()
+                    tabla.field_names = ["Clave","Nombre"]
+                    for clave, nombre in registros:
+                        tabla.add_row([clave, nombre])
+
+                    print(tabla)
+
+                    while True:
+                        try:
+                            clave = int(input("Ingrese la clave del servicio (0 para volver): "))
+
+                            if clave == 0:
+                                return
+                            
+                            cursor.execute("SELECT * FROM servicios WHERE clave=? AND cancelado = 'Sí'", (clave,))
+                            cliente = cursor.fetchone()
+
+                            if cliente:
+                                tabla = PrettyTable()
+                                tabla.field_names = ["Clave","Nombre", "Costo"]
+                                tabla.add_row([cliente[0], cliente[1], cliente[2]])
+
+                                print(tabla)
+
+                                while True:
+                                    confirmacion = input("\nConfirme la recuperación 1. Sí - 2. No: ")
+
+                                    if confirmacion == '1':
+                                        cursor.execute("UPDATE servicios SET cancelado = 'No' WHERE clave=?", (clave,))
+                                        conexion.commit()
+
+                                        print("El servicio ha sido recuperado")
+                                        break
+                                    
+                                    elif confirmacion == '2':
+                                        print("La recuperación ha sido cancelada")
+                                        break
+                                    
+                                    else:
+                                        print('Opción Incorrecta\n')
+
+                            else:
+                                print("No se encontró un servicio suspendido con esa clave")
+
+                            break
+
+                        except ValueError:
+                            print ("Por favor, ingresa una clave en número entero")
+
+                        except Exception: 
+                            print(f"Se produjo un error: {sys.exc_info()[1]}")
+
+                else:
+                    print('No se encontraron servicios suspendidos')
+                    break
+
+        except sqlite3.Error as e:
+            print(e)
+            break
+
+        except Exception: 
+            print(f"Se produjo un error: {sys.exc_info()[1]}")
+            break
+
+        finally: 
+            if conexion:
+                conexion.close()
+
+def consultar_servicios():
+    while True:
+        print("\n\n")
+        print("Bienvenido a Consultas y Reportes de Servicios\n\n")
+        print("1. Listado de Servicios")
+        print("2. Búsqueda por clave")
+        print("3. Búsqueda por nombre")
+        print("4. Volver al menú anterior")
+        eleccion = input('\nElija una opción (con un número del 1 al 4): ')
+
+        if eleccion == "1":
+            listado_de_servicios()
+        elif eleccion == "2":
+            try:
+                with sqlite3.connect("base_de_datos.db") as conexion:
+                    clave = int(input("Ingrese la clave del servicio a buscar: "))
+                    mi_cursor = conexion.cursor()
+                    mi_cursor.execute("SELECT * FROM servicios WHERE clave = ? AND cancelado = 'No' ORDER BY clave;", (clave,))
+                    registros = mi_cursor.fetchall()
+
+                    if registros:
+                        print()
+                        print("Clave\tNombre\tCosto")
+                        print("*" * 30)
+                        for clave, nombre, costo, cancelado in registros:
+                            print(f"{clave:^6}\t{nombre}\t{costo}")
+                        print()
+                    else:
+                        print("No se encontraron registros en la respuesta")
+            except ValueError:
+                print('Ingrese sólo números enteros')
+            except Error as e:
+                print (e)
+            except Exception:
+                print(f"Se produjo un error: {sys.exc_info()[0]}")
+            finally:
+                conexion.close()
+
+        elif eleccion == "3":
+            try:
+                with sqlite3.connect("base_de_datos.db") as conexion:
+                    nombre = input("Ingrese el nombre del servicio a buscar: ")
+                    mi_cursor = conexion.cursor()
+                    mi_cursor.execute("SELECT * FROM servicios WHERE nombre = ? AND cancelado = 'No' ORDER BY nombre;", (nombre,))
+                    registros = mi_cursor.fetchall()
+
+                    if registros:
+                        print()
+                        print("Clave\tNombre\t\tCosto")
+                        print("*" * 30)
+                        for clave, nombre, costo, cancelado in registros:
+                            print(f"{clave:^6}\t{nombre}\t{costo}")
+                        print()
+                    else:
+                        print("No se encontraron registros en la respuesta")
+    
+            except Error as e:
+                print (e)
+            except Exception:
+                print(f"Se produjo un error: {sys.exc_info()[0]}")
+            finally:
+                conexion.close()
+        elif eleccion == "4":
+            break
+        else:
+            print("Opción incorrecta")
+
+
+def listado_de_servicios():
+    while True:
+        print("\n\n")
+        print("Bienvenido a Listado de Servicios\n\n")
+        print("1. Ordenados por clave")
+        print("2. Ordenados por nombre")
+        print("3. Volver al menú anterior")
+        eleccion = input('\nElija una opción (con un número del 1 al 3): ')
+
+        try:
+            with sqlite3.connect("base_de_datos.db") as conexion:
+                cursor = conexion.cursor()
+                if eleccion == "1":
+                    cursor.execute("SELECT * FROM servicios WHERE cancelado = 'No' ORDER BY clave")
+                    registros = cursor.fetchall()
+                    servicios=[]
+                    if registros: 
+                        tabla = PrettyTable()
+                        tabla.field_names = ["Clave", "Nombre", "Costo"]
+                        for clave, nombre, costo, cancelado in registros:
+                            tabla.add_row([clave, nombre, costo])
+                            servicios.append([clave, nombre, costo])
+                        print(tabla)
+            
+                    else: 
+                        print("No hay servicios registrados")
+                        break
+
+                    
+                    while True:
+                        print("Exportar resultado")
+                        print("1. Exportar a CSV")
+                        print("2. Exportar a EXCEL")
+                        print("3. Regresar al menú anterior")
+                        
+                        eleccion_exp = input('Ingrese el tipo de exportación: ')
+
+                        dataf_servicios = pd.DataFrame(servicios)
+                        dataf_servicios.columns = ["Clave", "Nombre", "Costo"]
+
+                        fecha =  datetime.date.today().strftime('%m-%d-%Y')
+
+                        if eleccion_exp == "1":
+                            dataf_servicios.to_csv(f"ReporteServiciosPorClave_{fecha}.csv")
+                            break
+                        elif eleccion_exp == "2":
+                            dataf_servicios.to_excel(f"ReporteServiciosPorClave_{fecha}.xlsx")
+                            break
+                        elif eleccion_exp == "3": 
+                            break
+                        else: 
+                            print('Opcion no disponible')
+
+
+                elif eleccion == "2":
+                    cursor.execute("SELECT * FROM servicios WHERE cancelado = 'No' ORDER BY nombre;")
+                    registros = cursor.fetchall()
+                    servicios=[]
+
+                    if registros:
+                        tabla = PrettyTable()
+                        tabla.field_names = ["Clave", "Nombre", "Costo"]
+                        for clave, nombre, costo, cancelado in registros:
+                            tabla.add_row([clave, nombre, costo])
+                            servicios.append([clave, nombre, costo])
+                        print(tabla)
+            
+                    else: 
+                        print('No hay servicios registrados')
+                        break
+
+                    while True:
+                        print("Exportar resultado")
+                        print("1. Exportar a CSV")
+                        print("2. Exportar a EXCEL")
+                        print("3. Regresar al menú anterior")
+                        
+                        eleccion_exp = input('Ingrese el tipo de exportación: ')
+
+                        dataf_servicios = pd.DataFrame(servicios)
+                        dataf_servicios.columns = ["Clave", "Nombre", "Costo"]
+
+                        fecha =  datetime.date.today().strftime('%m-%d-%Y')
+
+                        if eleccion_exp == "1":
+                            dataf_servicios.to_csv(f"ReporteServiciosPorNombre_{fecha}.csv")
+                            break
+                        elif eleccion_exp == "2":
+                            dataf_servicios.to_excel(f"ReporteServiciosPorNombre_{fecha}.xlsx")
+                            break
+                        elif eleccion_exp == '3': 
+                            break
+                        else: 
+                            print('Opcion no disponible')
+
+
+                elif eleccion == "3":
+                    break
+                else:
+                    print("Opción incorrecta")
+
+        except Error as e:
+            print(e)
+        except Exception:
+            print(f"Se produjo un error: {sys.exc_info()[0]}")
+        finally:
+            if conexion:
+                conexion.close()
+
+def servicios_mas_prestados():
+    fecha_incio, fecha_fin = obtener_fechas()
+    try: 
+        with sqlite3.connect("base_de_datos.db") as conexion: 
+            cursor = conexion.cursor() 
+            rango = int(input('Ingrese la cantidad de registros: '))
+            if rango > 0: 
+                cursor.execute("""SELECT COUNT(Servicios.clave), Servicios.nombre 
+FROM servicios JOIN notaServicios ON servicios.clave = notaServicios.clave
+JOIN notas ON notas.folio = notaServicios.folio
+WHERE (notas.fecha BETWEEN ? AND ?)
+GROUP BY servicios.clave ORDER BY COUNT(servicios.clave) DESC LIMIT ?""", (fecha_incio, fecha_fin, rango))
+                
+                registros = cursor.fetchall()
+
+                if registros:
+                    tabla = PrettyTable()
+                    tabla.field_names = [ "Cantidad","Nombre"]
+                    for cantidad, nombre in registros:
+                        tabla.add_row([cantidad,nombre])
+                    print(tabla)
+
+                    df_registros = pd.DataFrame(registros)
+                else:
+                    print('No se encontraron registros')
+
+            else:
+                print('\nLa cantidad no puede ser 0')
+    except ValueError:
+        print('La cantidad de resgistros debe ser un número entero')
+    except Error as e:
+        print(e)
+    except Exception:
+        print(f"Se produjo un error: {sys.exc_info()[0]}")
+
+def clientes_con_mas_notas():
+    fecha_incio, fecha_fin = obtener_fechas()
+    try: 
+        with sqlite3.connect("base_de_datos.db") as conexion: 
+            cursor = conexion.cursor() 
+            rango = int(input('Ingrese la cantidad de registros: '))
+            if rango > 0: 
+                cursor.execute("""SELECT COUNT(clientes.clave), clientes.nombre 
+FROM clientes JOIN notas ON clientes.clave = notas.cliente
+WHERE (notas.fecha BETWEEN ? AND ?)
+GROUP BY clientes.clave ORDER BY COUNT(clientes.clave) DESC LIMIT ?""", (fecha_incio, fecha_fin, rango))
+                
+                registros = cursor.fetchall()
+
+                if registros:
+                    tabla = PrettyTable()
+                    tabla.field_names = [ "Cantidad","Nombre"]
+                    for cantidad, nombre in registros:
+                        tabla.add_row([cantidad,nombre])
+                    print(tabla)
+
+                    df_registros = pd.DataFrame(registros)
+                else:
+                    print('No se encontraron registros')
+
+            else:
+                print('\nLa cantidad no puede ser 0')
+    except ValueError:
+        print('La cantidad de resgistros debe ser un número entero')
+    except Error as e:
+        print(e)
+    except Exception:
+        print(f"Se produjo un error: {sys.exc_info()[0]}")
+    
+
+def  promedio_montos_notas():
+    fecha_incio, fecha_fin = obtener_fechas()
+
+    try: 
+        with sqlite3.connect("base_de_datos.db") as conexion: 
+            cursor = conexion.cursor() 
+            cursor.execute("SELECT AVG(monto) FROM notas WHERE fecha BETWEEN ? AND ?", (fecha_incio, fecha_fin))
+            
+            promedio = cursor.fetchone()
+
+            if promedio[0] is not None:
+                print("El promedio de los montos es: ")
+                print(promedio[0])
+            else:
+                print('No se encontraron registros')
+
+    except Error as e:
+        print(e)
+    except Exception:
+        print(f"Se produjo un error: {sys.exc_info()[0]}")
+    
+
+def obtener_fechas():
+    while True:
+        try:
+            fecha_inicio = input("Ingesa la fecha inicial (dd/mm/aaaa): ")
+            fecha_inicio = datetime.datetime.strptime(fecha_inicio,"%d/%m/%Y").date()
+
+            fecha_fin = input("Ingresa la fecha final (dd/mm/aaaa): ")
+            fecha_fin = datetime.datetime.strptime(fecha_fin,"%d/%m/%Y").date()
+            if fecha_inicio > fecha_fin:
+                print('La fecha inicial no puede ser mayor a la final')
+            else:
+                break
+
+        except ValueError:
+            print('Formato de fecha incorrecto')
+        except Exception:
+            print(f"Se produjo un error: {sys.exc_info()[0]}")
+        else:
+            break 
+    
+    return fecha_inicio, fecha_fin
+
+
+
+def menu_1():
+    while True:
+        print("\n\n")
+        print("Bienvenido al Menú Notas\n\n")
+        print("1. Registrar una nueva nota")
+        print("2. Cancelar una nota")
+        print("3. Recuperar una nota")
+        print("4. Consultas y Reportes")
+        print("5. Volver al menú principal")
+        eleccion = input('\nElija una opción (con un número del 1 al 5): ')
+
+        print("\n\n")
+
+        if eleccion == '1':
+            nueva_nota()
+        elif eleccion == '2':
+            cancelar_nota()
+        elif eleccion == '3':
+            recuperar_nota()
+        elif eleccion == '4':
+            menu_consultas_notas()
+        elif eleccion == '5':
+            return
+        else:
+            print('Por favor, elija una opción válida.')
+
+
+def menu_2():
+    while True:
+        print("\n\n")
+        print("Bienvenido al Menú Clientes\n\n")
+        print("1. Registrar un nuevo cliente")
+        print("2. Suspender un cliente")
+        print("3. Recuperar un cliente")
+        print("4. Consultar clientes")
+        print("5. Volver al menú principal")
+        eleccion = input('\nElija una opción (con un número del 1 al 5): ')
+
+        print("\n\n")
+
+        if eleccion == '1':
+            nuevo_cliente()
+        elif eleccion == '2':
+            suspender_cliente()
+        elif eleccion == '3':
+            recuperar_cliente()
+        elif eleccion == '4':
+            consultar_clientes()
+        elif eleccion == '5':
+            return
+        else:
+            print('Por favor, elija una opción válida.')
+
+def menu_3():
+    while True:
+        print("\n\n")
+        print("Bienvenido al Menú Servicios\n\n")
+        print("1. Registrar un nuevo servicio")
+        print("2. Suspender un servicio")
+        print("3. Recuperar un servicio")
+        print("4. Consultar servicios")
+        print("5. Volver al menú principal")
+        eleccion = input('\nElija una opción (con un número del 1 al 5): ')
+
+        print("\n\n")
+
+        if eleccion == '1':
+            nuevo_servicio()
+        elif eleccion == '2':
+            suspender_servicio()
+        elif eleccion == '3':
+            recuperar_servicio()
+        elif eleccion == '4':
+            consultar_servicios()
+        elif eleccion == '5':
+            return
+        else:
+            print('Por favor, elija una opción válida.')
+
+def menu_4():
+    while True:
+        print("\n\n")
+        print("Bienvenido al Menú Estadísticas\n\n")
+        print("1. Servicios más prestados")
+        print("2. Clientes con más notas")
+        print("3. Promedio de montos de las notas")
+        print("4. Volver al menú principal")
+        eleccion = input('\nElija una opción (con un número del 1 al 4): ')
+
+        print("\n\n")
+
+        if eleccion == '1':
+            servicios_mas_prestados()
+        elif eleccion == '2':
+            clientes_con_mas_notas()
+        elif eleccion == '3':
+            promedio_montos_notas()
+        elif eleccion == '4':
+            break
+        else:
+            print('Por favor, elija una opción válida.')
+
+
+        
+while True:
+    print("\n\n")
+    print("Bienvenido al taller mecánico\n\n")
+    print("1. Menú Notas")
+    print("2. Menú Clientes")
+    print("3. Menú Servicios")
+    print("4. Menú Estadísticas")
+    print("5. Salir")
+    opcionmenu = input("Elige un menú: ")
+
+    if opcionmenu == '1':
+        menu_1()
+    elif opcionmenu == '2':
+        menu_2()
+    elif opcionmenu == '3':
+        menu_3()
+    elif opcionmenu == '4':
+        menu_4()
+    # Agrega aquí las otras opciones del menú principal si es necesario.
+    elif opcionmenu == '5':
+        break
+    else:
+        print("Opción no disponible")
+
+if _name_ == "_main_":
+    taller = TallerMecanico()
