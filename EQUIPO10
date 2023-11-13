@@ -1,55 +1,16 @@
 import sqlite3
-from sqlite3 import Error
-import sys
-
-try:
-    with sqlite3.connect("base_de_datos.db") as conexion:
-        cursor = conexion.cursor()
-
-        cursor.execute("CREATE TABLE IF NOT EXISTS clientes (clave INTEGER PRIMARY KEY, nombre TEXT NOT NULL, rfc TEXT NOT NULL, correo TEXT NOT NULL, cancelado TEXT NOT NULL);")
-        
-        cursor.execute("CREATE TABLE IF NOT EXISTS notas (folio INTEGER PRIMARY KEY, fecha TIMESTAMP, cliente INTEGER NOT NULL, monto INTEGER, cancelado TEXT NOT NULL, FOREIGN KEY(cliente) REFERENCES clientes(clave));")
-        
-        cursor.execute("CREATE TABLE IF NOT EXISTS servicios (clave INTEGER PRIMARY KEY, nombre TEXT NOT NULL, costo INTEGER NOT NULL, cancelado TEXT NOT NULL);")
-        
-        cursor.execute("CREATE TABLE IF NOT EXISTS notaServicios (folio INTEGER NOT NULL, clave INTEGER NOT NULL, FOREIGN KEY (folio) REFERENCES notas(folio), FOREIGN KEY (clave) REFERENCES servicios(clave));")
-        
-except Error as e:
-    print(e)
-except Exception:
-    print(f'Se produjo el siguiente error: {sys.exc_info[0]}')
-finally:
-    if (conexion):
-        conexion.close()
-        print("Se ha cerrado la conexión")
-
-
-
-import sqlite3
 import datetime
 import re
 from prettytable import PrettyTable
 from sqlite3 import Error
 import sys
-import csv
 import pandas as pd
-
 
 
 
 registros_servicios = {}
 notas_cancel = {}
 notas_ing = {}
-
-
-
-class TallerMecanico:
-    def __init__(self):
-        self.conexion = sqlite3.connect('base_de_datos.db')
-    
-    def __del__(self):
-        self.conexion.close()
-
 
 def generar_rfc():
     while True:
@@ -58,7 +19,6 @@ def generar_rfc():
             return rfc
         else:
             print("RFC no válido. El RFC debe tener el formato AAAA######AAA (letras mayúsculas y números).")
-
 
 
 
@@ -198,7 +158,6 @@ def cancelar_nota():
         
         folio = input("Ingrese el número de folio de la nota que desea cancelar: ")
 
-        
         cursor.execute('SELECT * FROM notas WHERE folio = ?', (folio,))
         nota_actual = cursor.fetchone()
 
@@ -209,7 +168,6 @@ def cancelar_nota():
             print("Contenido:", nota_actual[2])
             print("Cancelado:", nota_actual[3])
 
-            
             respuesta = input("¿Desea cancelar la nota? (s/n): ").lower()
 
             if respuesta == 's':
@@ -233,8 +191,7 @@ def recuperar_nota():
         
         folio = input("Ingrese el número de folio de la nota que desea recuperar: ")
 
-        
-        cursor.execute('SELECT * FROM notas WHERE folio = ?', (folio,))
+        cursor.execute("SELECT * FROM notas WHERE folio = ? AND cancelado = 'Sí'", (folio,))
         nota_actual = cursor.fetchone()
 
         if nota_actual:
@@ -244,7 +201,6 @@ def recuperar_nota():
             print("Contenido:", nota_actual[2])
             print("Cancelado:", nota_actual[3])
 
-            
             respuesta = input("¿Desea recuperar la nota? (s/n): ").lower()
 
             if respuesta == 's':
@@ -287,7 +243,7 @@ def consulta_periodo():
         try:
             fecha_inicio = input("Ingrese la fecha de inicio (dd/mm/aaaa): ")
             if fecha_inicio == "":
-                fecha_inicio_c = datetime.date.today()
+                fecha_inicio_c = datetime.datetime.strptime("01/01/2000", "%d/%m/%Y").date()
             else:
                 fecha_inicio_c = datetime.datetime.strptime(fecha_inicio, "%d/%m/%Y").date()
 
@@ -379,7 +335,7 @@ def consulta_por_folio():
         conexion.close()
 
 
-
+#######clientes#########
 
 
 def nuevo_cliente():
@@ -411,6 +367,378 @@ def nuevo_cliente():
           print(f"Se produjo el siguiente error: {sys.exc_info()[0]}")
     finally:
           conn.close()
+
+def suspender_cliente():
+    while True:
+        try: 
+            with sqlite3.connect("base_de_datos.db") as conexion:
+                cursor = conexion.cursor()
+
+                cursor.execute("SELECT clave, nombre FROM clientes WHERE cancelado = 'No'")
+                registros = cursor.fetchall()
+
+                if registros:
+                    tabla = PrettyTable()
+                    tabla.field_names = ["Clave","Nombre"]
+                    for clave, nombre in registros:
+                        tabla.add_row([clave, nombre])
+
+                    print(tabla)
+
+                    while True:
+                        try:
+                            clave = int(input("Ingrese la clave del cliente (0 para volver): "))
+
+                            if clave == 0:
+                                return
+                            
+                            cursor.execute("SELECT * FROM clientes WHERE clave=? AND cancelado = 'No'", (clave,))
+                            cliente = cursor.fetchone()
+
+                            if cliente:
+                                tabla = PrettyTable()
+                                tabla.field_names = ["Clave","Nombre", "RFC", "Correo"]
+                                tabla.add_row([cliente[0], cliente[1], cliente[2], cliente[3]])
+
+                                print(tabla)
+
+                                while True:
+                                    confirmacion = input("\nConfirme la suspensión 1. Sí - 2. No: ")
+
+                                    if confirmacion == '1':
+                                        cursor.execute("UPDATE clientes SET cancelado = 'Sí' WHERE clave=?", (clave,))
+                                        conexion.commit()
+
+                                        print("El cliente ha sido suspendido")
+                                        break
+                                    
+                                    elif confirmacion == '2':
+                                        print("La suspensión ha sido cancelada")
+                                        break
+                                    
+                                    else:
+                                        print('Opción Incorrecta\n')
+
+                            else:
+                                print("No se encontró un cliente con esa clave")
+
+                            break
+
+                        except ValueError:
+                            print ("Por favor, ingresa una clave en número entero")
+
+                        except Exception: 
+                            print(f"Se produjo un error: {sys.exc_info()[1]}")
+
+                else:
+                    print('No se encontraron clientes')
+                    break
+
+        except sqlite3.Error as e:
+            print(e)
+            break
+
+        except Exception: 
+            print(f"Se produjo un error: {sys.exc_info()[1]}")
+            break
+
+        finally: 
+            if conexion:
+                conexion.close()
+
+def recuperar_cliente():
+    while True:
+        try: 
+            with sqlite3.connect("base_de_datos.db") as conexion:
+                cursor = conexion.cursor()
+
+                cursor.execute("SELECT clave, nombre FROM clientes WHERE cancelado = 'Sí'")
+                registros = cursor.fetchall()
+
+                if registros:
+                    tabla = PrettyTable()
+                    tabla.field_names = ["Clave","Nombre"]
+                    for clave, nombre in registros:
+                        tabla.add_row([clave, nombre])
+
+                    print(tabla)
+
+                    while True:
+                        try:
+                            clave = int(input("Ingrese la clave del cliente (0 para volver): "))
+
+                            if clave == 0:
+                                return
+                            
+                            cursor.execute("SELECT * FROM clientes WHERE clave=? AND cancelado = 'Sí'", (clave,))
+                            cliente = cursor.fetchone()
+
+                            if cliente:
+                                tabla = PrettyTable()
+                                tabla.field_names = ["Clave","Nombre", "RFC", "Correo"]
+                                tabla.add_row([cliente[0], cliente[1], cliente[2], cliente[3]])
+
+                                print(tabla)
+
+                                while True:
+                                    confirmacion = input("\nConfirme la recuperación 1. Sí - 2. No: ")
+
+                                    if confirmacion == '1':
+                                        cursor.execute("UPDATE clientes SET cancelado = 'No' WHERE clave=?", (clave,))
+                                        conexion.commit()
+
+                                        print("El cliente ha sido recuperado")
+                                        break
+                                    
+                                    elif confirmacion == '2':
+                                        print("La recuperación ha sido cancelada")
+                                        break
+                                    
+                                    else:
+                                        print('Opción Incorrecta\n')
+
+                            else:
+                                print("No se encontró un cliente suspendido con esa clave")
+
+                            break
+
+                        except ValueError:
+                            print ("Por favor, ingresa una clave en número entero")
+
+                        except Exception: 
+                            print(f"Se produjo un error: {sys.exc_info()[1]}")
+
+                else:
+                    print('No se encontraron clientes suspendidos')
+                    break
+
+        except sqlite3.Error as e:
+            print(e)
+            break
+
+        except Exception: 
+            print(f"Se produjo un error: {sys.exc_info()[1]}")
+            break
+
+        finally: 
+            if conexion:
+                conexion.close()
+
+def consultar_clientes():
+    while True:
+        print("Consultas")
+        print("1. Listado de clientes registrados")
+        print("2. Busqueda por clave")
+        print("3. Busqueda por nombre")
+        print("4. Volver al menu principal")
+
+        while True:
+            try:
+                consulta = int(input('Elija una opción (con un numero del 1 al 4): '))
+
+            except ValueError:
+                print ("Por favor, ingresa un dato valido")
+            else:
+                    if consulta > 0 and consulta <= 4:
+                        break
+                    else:
+                        print('Por favor, sólo las opciones disponibles')
+
+        if consulta == 1:
+            while True:
+                print("1. Ordenado por clave")
+                print("2. Ordenado por nombre")
+                print("3. Volver al menú anterior")
+                consulta_sub = input("\nElija una opción (con un número del 1 al 3): ")
+                try:
+                    with sqlite3.connect("base_de_datos.db") as conexion:
+                        cursor = conexion.cursor()
+
+                        if consulta_sub == '1':
+                            cursor.execute("SELECT * FROM clientes WHERE cancelado = 'No' ORDER BY clave;")
+                            registros = cursor.fetchall()
+                            servicios = []
+                            if registros:
+                                tabla = PrettyTable()
+                                tabla.field_names = ["Clave", "Nombre", "rfc", "correo"]
+                                for clave, nombre, rfc, correo, cancelado in registros:
+                                    tabla.add_row([clave, nombre, rfc, correo])
+                                    servicios.append([clave, nombre, rfc, correo])
+                                print(tabla)
+
+                                while True:
+                                    print("Exportar resultado")
+                                    print("1. Exportar a CSV")
+                                    print("2. Exportar a EXCEL")
+                                    print("3. Regresar al menú anterior")
+
+                                    eleccion_exp = input('Ingrese el tipo de exportación: ')
+
+                                    dataf_servicios = pd.DataFrame(servicios)
+                                    dataf_servicios.columns = ["Clave", "Nombre", "rfc", "correo"]
+
+                                    fecha = datetime.date.today().strftime('%m-%d-%Y')
+
+                                    if eleccion_exp == "1":
+                                        dataf_servicios.to_csv(f"ReporteClientesPorClave_{fecha}.csv", index=False)
+                                        print("El reporte se ha exportado a CSV.")
+                                        break
+                                    elif eleccion_exp == "2":
+                                        dataf_servicios.to_excel(f"ReporteClientesPorClave_{fecha}.xlsx", index=False)
+                                        print("El reporte se ha exportado a Excel.")
+                                        break
+                                    elif eleccion_exp == '3':
+                                        break
+                                    else:
+                                        print('Opción no disponible')
+                            else:
+                                print('No se encontraron registros')
+
+                        elif consulta_sub == "2":
+                            cursor.execute("SELECT * FROM clientes WHERE cancelado = 'No' ORDER BY nombre")
+                            registros = cursor.fetchall()
+                            servicios = []
+
+                            if registros:
+                                tabla = PrettyTable()
+                                tabla.field_names = ["Clave", "Nombre", "rfc", "correo"]
+                                for clave, nombre, rfc, correo, cancelado in registros:
+                                    tabla.add_row([clave, nombre, rfc, correo])
+                                    servicios.append([clave, nombre, rfc, correo])
+                                print(tabla)
+
+                                while True:
+                                    print("Exportar resultado")
+                                    print("1. Exportar a CSV")
+                                    print("2. Exportar a EXCEL")
+                                    print("3. Regresar al menú anterior")
+
+                                    eleccion_exp = input('Ingrese el tipo de exportación: ')
+
+                                    dataf_servicios = pd.DataFrame(servicios)
+                                    dataf_servicios.columns = ["Clave", "Nombre", "rfc", "correo"]
+
+                                    fecha = datetime.date.today().strftime('%m-%d-%Y')
+
+                                    if eleccion_exp == "1":
+                                        dataf_servicios.to_csv(f"ReporteClientesPorNombre_{fecha}.csv", index=False)
+                                        print("El reporte se ha exportado a CSV.")
+                                        break
+                                    elif eleccion_exp == "2":
+                                        dataf_servicios.to_excel(f"ReporteClientesPorNombre_{fecha}.xlsx", index=False)
+                                        print("El reporte se ha exportado a Excel.")
+                                        break
+                                    elif eleccion_exp == '3':
+                                        break
+                                    else:
+                                        print('Opción no disponible')
+
+                            else:
+                                print('No se encontraron registros')
+
+                            
+                        elif consulta_sub == "3":
+                            break
+                        else:
+                            print("Opción Incorrecta")
+                except Error as e:
+                    print(e)
+                except Exception as e:
+                    print(f'Se produjo el siguiente error: {e}')
+                finally:
+                    if conexion:
+                        conexion.close()
+
+        elif consulta == 2:
+            try:
+                with sqlite3.connect("base_de_datos.db") as conexion:
+                    clave = int(input("Ingrese la clave del cliente a buscar: "))
+                    mi_cursor = conexion.cursor()
+                    mi_cursor.execute("SELECT * FROM clientes WHERE clave = ? AND cancelado = 'No' ORDER BY clave;", (clave,))
+                    registros = mi_cursor.fetchall()
+
+                    if registros:
+                        print()
+                        print("Clave\tNombre\tRFC\t\tCorreo")
+                        print("*" * 30)
+                        for clave, nombre, RFC, correo, cancelado in registros:
+                            print(f"{clave:^6}\t{nombre}\t{RFC}\t{correo}")
+                        print()
+                    else:
+                        print("No se encontraron registros en la respuesta")
+            except ValueError:
+                print('Ingrese sólo números enteros')
+            except Error as e:
+                print (e)
+            except Exception:
+                print(f"Se produjo un error: {sys.exc_info()[0]}")
+            finally:
+                conexion.close()
+
+        elif consulta == 3:
+            try:
+                with sqlite3.connect("base_de_datos.db") as conexion:
+                    nombre = input("Ingrese el nombre del cliente a buscar: ")
+                    mi_cursor = conexion.cursor()
+                    mi_cursor.execute("SELECT * FROM clientes WHERE nombre = ? AND cancelado = 'No' ORDER BY nombre;", (nombre,))
+                    registros = mi_cursor.fetchall()
+
+                    if registros:
+                        print()
+                        print("Clave\tNombre\tRFC\t\tCorreo")
+                        print("*" * 30)
+                        for clave, nombre, RFC, correo, cancelado in registros:
+                            print(f"{clave:^6}\t{nombre}\t{RFC}\t{correo}")
+                        print()
+                    else:
+                        print("No se encontraron registros en la respuesta")
+            except Error as e:
+                print (e)
+            except Exception:
+                print(f"Se produjo un error: {sys.exc_info()[0]}")
+            finally:
+                conexion.close()
+
+        elif consulta == 4:
+            break
+        else:
+            print('Opción no disponible')
+
+
+def nuevo_servicio():
+    while True:
+        nombre = input('\nIngrese el nombre del servicio: ')
+        if nombre.strip():
+            break
+        else:
+            print('Debe asignar un nombre válido al servicio')
+        
+    while True:
+        costo = float(input("Costo del servicio: "))
+        if costo > 0:
+            break
+        else:
+            print('El costo del servicio no puede ser menor a 1')
+
+    try:
+        with sqlite3.connect("base_de_datos.db") as conexion:
+
+            cursor = conexion.cursor()
+
+            valores = (nombre, costo, 'No')
+
+            cursor.execute("INSERT INTO servicios (nombre, costo, cancelado) VALUES (?,?,?)", valores)
+
+    except Error as e:
+        print(e)
+
+    except Exception as e:
+        print(f'Se produjo el siguiente error: {e}') 
+
+    finally:
+        if (conexion):
+            conexion.close()
+
 
 def suspender_cliente():
     while True:
