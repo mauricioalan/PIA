@@ -335,7 +335,7 @@ def consulta_por_folio():
         conexion.close()
 
 
-#######clientes#########
+
 
 
 def nuevo_cliente():
