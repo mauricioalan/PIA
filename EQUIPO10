@@ -1,4 +1,30 @@
 import sqlite3
+from sqlite3 import Error
+import sys
+
+try:
+    with sqlite3.connect("base_de_datos.db") as conexion:
+        cursor = conexion.cursor()
+
+        cursor.execute("CREATE TABLE IF NOT EXISTS clientes (clave INTEGER PRIMARY KEY, nombre TEXT NOT NULL, rfc TEXT NOT NULL, correo TEXT NOT NULL, cancelado TEXT NOT NULL);")
+        
+        cursor.execute("CREATE TABLE IF NOT EXISTS notas (folio INTEGER PRIMARY KEY, fecha TIMESTAMP, cliente INTEGER NOT NULL, monto INTEGER, cancelado TEXT NOT NULL, FOREIGN KEY(cliente) REFERENCES clientes(clave));")
+        
+        cursor.execute("CREATE TABLE IF NOT EXISTS servicios (clave INTEGER PRIMARY KEY, nombre TEXT NOT NULL, costo INTEGER NOT NULL, cancelado TEXT NOT NULL);")
+        
+        cursor.execute("CREATE TABLE IF NOT EXISTS notaServicios (folio INTEGER NOT NULL, clave INTEGER NOT NULL, FOREIGN KEY (folio) REFERENCES notas(folio), FOREIGN KEY (clave) REFERENCES servicios(clave));")
+        
+except Error as e:
+    print(e)
+except Exception:
+    print(f'Se produjo el siguiente error: {sys.exc_info[0]}')
+finally:
+    if (conexion):
+        conexion.close()
+        print("Se ha cerrado la conexión")
+
+
+import sqlite3
 import datetime
 import re
 from prettytable import PrettyTable
@@ -1189,6 +1215,7 @@ def suspender_servicio():
         finally: 
             if conexion:
                 conexion.close()
+
 def recuperar_servicio():
     while True:
         try: 
@@ -1466,7 +1493,7 @@ GROUP BY servicios.clave ORDER BY COUNT(servicios.clave) DESC LIMIT ?""", (fecha
                         tabla.add_row([cantidad,nombre])
                     print(tabla)
 
-                    df_registros = pd.DataFrame(registros)
+                    exportar(f'ReporteServiciosMasPrestados_{fecha_incio}_{fecha_fin}', registros)
                 else:
                     print('No se encontraron registros')
 
@@ -1500,7 +1527,7 @@ GROUP BY clientes.clave ORDER BY COUNT(clientes.clave) DESC LIMIT ?""", (fecha_i
                         tabla.add_row([cantidad,nombre])
                     print(tabla)
 
-                    df_registros = pd.DataFrame(registros)
+                    exportar(f'ReporteClientesConMasNotas_{fecha_incio}_{fecha_fin}', registros)
                 else:
                     print('No se encontraron registros')
 
@@ -1557,6 +1584,29 @@ def obtener_fechas():
             break 
     
     return fecha_inicio, fecha_fin
+
+def exportar(nombre_archivo, registros):
+
+    print("Bienvenido al Menú Exportación")
+    print("1. Exportar resultado a csv (.csv)")
+    print("2. Exportar resultado a Excel (.xlsx)")
+    print("3. Regresar al menú anterior")
+    
+    seleccion_exportacion = input('Seleccione el tipo de exportación deseada: ')
+    
+    df_listaclientes = pd.DataFrame(registros)
+
+    if seleccion_exportacion == '1':
+        df_listaclientes.to_csv(f'{nombre_archivo}.csv')
+
+    elif seleccion_exportacion == '2': 
+        df_listaclientes.to_excel((f'{nombre_archivo}.xlsx'))
+
+    elif seleccion_exportacion == '3': 
+        return
+    else:
+        print('No es una opción válida.')
+        input('Presione Enter para continuar') 
 
 
 
@@ -1682,11 +1732,17 @@ while True:
         menu_3()
     elif opcionmenu == '4':
         menu_4()
-    # Agrega aquí las otras opciones del menú principal si es necesario.
     elif opcionmenu == '5':
-        break
+        while True:
+            confirmar = input('¿Estás seguro que desas salir del sistema? 1. Sí - 2. No: ')
+            if confirmar == '1':
+                break
+            elif confirmar == '2':
+                print('Se le devolverá al menú principal')
+                break
+            else:
+                print('Opción incorrecta')
+        if confirmar == '1':
+            break
     else:
         print("Opción no disponible")
-
-if _name_ == "_main_":
-    taller = TallerMecanico()
